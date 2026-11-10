@@ -1,0 +1,20 @@
+# Бинарники (собираются в CI или локально)
+/cslvpn
+/cslvpn.exe
+/cslvpn-*
+dist/
+
+# Go
+*.test
+*.out
+/vendor/
+
+# Редакторы/ОС
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Локальные артефакты тестов
+/tmp/
+*.log
