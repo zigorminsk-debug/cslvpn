@@ -39,6 +39,9 @@ jobs:
       - name: go vet
         run: go vet ./...
       - name: unit + integration tests
+        # -race needs cgo, and cgo is disabled globally for the static builds.
+        env:
+          CGO_ENABLED: "1"
         run: go test -race -count=1 ./...
       - name: build
         run: go build -trimpath -ldflags "-s -w -X main.Version=${GITHUB_SHA::7}" -o cslvpn ./cmd/cslvpn
