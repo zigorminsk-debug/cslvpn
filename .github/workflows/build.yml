@@ -51,12 +51,12 @@ jobs:
         if: failure()
         run: |
           set +e
-          esc() { tr '\n' ' ' | head -c 1200; }
+          esc() { tr '\n' ' ' | tail -c 1500; }
           echo "::error::go version: $(go version 2>&1 | esc)"
           echo "::error::go env: $(go env GOFLAGS GOOS GOARCH 2>&1 | esc)"
           echo "::error::gofmt: $(gofmt -d ./cmd ./internal 2>&1 | esc)"
           echo "::error::vet: $(go vet ./... 2>&1 | esc)"
-          echo "::error::test: $(go test -count=1 ./... 2>&1 | esc)"
+          go test -race -count=1 ./... >/tmp/t.log 2>&1; echo "::error::race test exit=$? output: $(esc </tmp/t.log)"
 
   # The end-to-end tests need root (network namespaces, TUN devices), which the
   # hosted runners provide.
