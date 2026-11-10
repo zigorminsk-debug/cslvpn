@@ -10,4 +10,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with: { go-version: 'stable' }
-      - run: go version
+      - run: go version | tee /tmp/v.txt && uname -a >> /tmp/v.txt
+      - uses: actions/upload-artifact@v4
+        with: {name: probe, path: /tmp/v.txt}
