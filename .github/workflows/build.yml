@@ -55,6 +55,8 @@ jobs:
       # Cross-compilation is cheap here and catches platform-specific breakage
       # (build tags, syscall wrappers) long before the release matrix runs.
       - name: cross-compile smoke test
+        env:
+          CGO_ENABLED: "0"
         run: |
           set -euo pipefail
           for target in windows/amd64 windows/arm64 darwin/amd64 darwin/arm64 linux/arm64 linux/arm; do
