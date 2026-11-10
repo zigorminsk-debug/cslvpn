@@ -31,7 +31,9 @@ func testServer(t *testing.T) *Server {
 	cfg := DefaultConfig()
 	cfg.PeerTimeout = 5 * time.Second
 	cfg.Keepalive = time.Second
-	cfg.Logf = t.Logf
+	// log.Printf is safe from background goroutines, t.Logf is not (it fails the
+	// test when called after it finished, and the race detector flags it).
+	cfg.Logf = log.New(io.Discard, "", 0).Printf
 	return NewServer(cfg, log.New(io.Discard, "", 0))
 }
 
@@ -184,7 +186,7 @@ func TestWrongPasswordRejected(t *testing.T) {
 func TestNetworkCreationDisabled(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.AllowCreate = false
-	cfg.Logf = t.Logf
+	cfg.Logf = log.New(io.Discard, "", 0).Printf
 	srv := NewServer(cfg, log.New(io.Discard, "", 0))
 	if err := srv.StartUDP("127.0.0.1:0"); err != nil {
 		t.Fatal(err)
