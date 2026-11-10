@@ -39,10 +39,17 @@ jobs:
       - name: go vet
         run: go vet ./...
       - name: unit + integration tests
-        # -race needs cgo, and cgo is disabled globally for the static builds.
+        run: go test -count=1 ./...
+
+      # The race detector needs cgo. It is enabled per step (the workflow level
+      # CGO_ENABLED=0 keeps the shipped binaries static).
+      - name: race detector
         env:
           CGO_ENABLED: "1"
-        run: go test -race -count=1 ./...
+        run: |
+          set -euo pipefail
+          if ! command -v gcc >/dev/null; then sudo apt-get update && sudo apt-get install -y gcc; fi
+          go test -race -count=1 ./...
       - name: build
         run: go build -trimpath -ldflags "-s -w -X main.Version=${GITHUB_SHA::7}" -o cslvpn ./cmd/cslvpn
       # Runner logs are not always reachable from automation; surface the reason
@@ -53,7 +60,7 @@ jobs:
           set +e
           esc() { tr '\n' ' ' | tail -c 1500; }
           echo "::error::go version: $(go version 2>&1 | esc)"
-          echo "::error::go env: $(go env GOFLAGS GOOS GOARCH 2>&1 | esc)"
+          echo "::error::go env: $(go env GOFLAGS GOOS GOARCH CGO_ENABLED 2>&1 | esc)"
           echo "::error::gofmt: $(gofmt -d ./cmd ./internal 2>&1 | esc)"
           echo "::error::vet: $(go vet ./... 2>&1 | esc)"
           go test -race -count=1 ./... >/tmp/t.log 2>&1; echo "::error::race test exit=$? output: $(esc </tmp/t.log)"
