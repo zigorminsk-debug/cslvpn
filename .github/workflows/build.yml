@@ -52,6 +52,15 @@ jobs:
           go test -race -count=1 ./...
       - name: build
         run: go build -trimpath -ldflags "-s -w -X main.Version=${GITHUB_SHA::7}" -o cslvpn ./cmd/cslvpn
+      # Cross-compilation is cheap here and catches platform-specific breakage
+      # (build tags, syscall wrappers) long before the release matrix runs.
+      - name: cross-compile smoke test
+        run: |
+          set -euo pipefail
+          for target in windows/amd64 windows/arm64 darwin/amd64 darwin/arm64 linux/arm64 linux/arm; do
+            GOOS=${target%/*} GOARCH=${target#*/} GOARM=7 go build -o /dev/null ./cmd/cslvpn
+            echo "ok $target"
+          done
       # Runner logs are not always reachable from automation; surface the reason
       # of a failure as an annotation so it shows up in the PR/commit checks.
       - name: diagnose
@@ -88,14 +97,19 @@ jobs:
         run: sudo -E bash scripts/e2e-test.sh
       - name: e2e - internet access through the relay (gateway + NAT)
         run: sudo -E bash scripts/nat-test.sh
-      - name: upload logs
+      - name: collect logs
         if: always()
-        uses: actions/upload-artifact@v7
+        run: |
+          mkdir -p "$RUNNER_TEMP/e2e-logs"
+          sudo find /tmp -maxdepth 2 -name 'relay.log' -o -maxdepth 2 -name 'client-*.log' 2>/dev/null \
+            | xargs -r sudo cp -t "$RUNNER_TEMP/e2e-logs" 2>/dev/null || true
+          sudo chown -R "$USER" "$RUNNER_TEMP/e2e-logs" || true
+          ls -l "$RUNNER_TEMP/e2e-logs" || true
+      - uses: actions/upload-artifact@v7
+        if: always()
         with:
           name: e2e-logs
-          path: |
-            /tmp/tmp.*/relay.log
-            /tmp/tmp.*/client-*.log
+          path: ${{ runner.temp }}/e2e-logs
           if-no-files-found: ignore
           retention-days: 7
 
