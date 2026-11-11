@@ -104,20 +104,37 @@ jobs:
       # runners. A genuine regression fails twice.
       - name: e2e - isolated networks, udp+tcp, isolation, admin api
         run: |
-          sudo -E bash scripts/e2e-test.sh || {
+          set +e
+          sudo -E bash scripts/e2e-test.sh 2>&1 | tee /tmp/e2e-1.log
+          rc=${PIPESTATUS[0]}
+          if [ "$rc" -ne 0 ]; then
             echo "::warning::isolated-networks e2e failed on the first attempt, retrying once"
             sudo pkill -x cslvpn || true
             sleep 3
-            sudo -E bash scripts/e2e-test.sh
-          }
+            sudo -E bash scripts/e2e-test.sh 2>&1 | tee /tmp/e2e-2.log
+            rc=${PIPESTATUS[0]}
+          fi
+          if [ "$rc" -ne 0 ]; then
+            echo "::error::e2e tail: $(tail -c 1500 /tmp/e2e-2.log | tr '\n' ' ')"
+          fi
+          exit "$rc"
       - name: e2e - internet access through the relay (gateway + NAT)
         run: |
-          sudo -E bash scripts/nat-test.sh || {
+          set +e
+          sudo -E bash scripts/nat-test.sh 2>&1 | tee /tmp/nat-1.log
+          rc=${PIPESTATUS[0]}
+          if [ "$rc" -ne 0 ]; then
             echo "::warning::NAT e2e failed on the first attempt, retrying once"
             sudo pkill -x cslvpn || true
             sleep 3
-            sudo -E bash scripts/nat-test.sh
-          }
+            sudo -E bash scripts/nat-test.sh 2>&1 | tee /tmp/nat-2.log
+            rc=${PIPESTATUS[0]}
+          fi
+          if [ "$rc" -ne 0 ]; then
+            # the script's own messages are the only clue we get in CI
+            echo "::error::nat-test tail: $(tail -c 1500 /tmp/nat-2.log | tr '\n' ' ')"
+          fi
+          exit "$rc"
       - name: log tails on failure
         if: failure()
         run: |
