@@ -44,8 +44,6 @@ OutFile "${OUT}"
 InstallDir "$PROGRAMFILES64\CSLVPN"
 InstallDirRegKey HKLM "Software\CSLVPN" "InstallDir"
 RequestExecutionLevel admin
-; install for all users: shortcuts, registry and $APPDATA point at all-users paths
-SetShellVarContext all
 SetCompressor /SOLID lzma
 BrandingText "${APPNAME} - isolated virtual LANs over UDP/TCP"
 
@@ -68,6 +66,17 @@ VIAddVersionKey "LegalCopyright" "MIT License"
 !insertmacro MUI_UNPAGE_CONFIRM
 !insertmacro MUI_UNPAGE_INSTFILES
 !insertmacro MUI_LANGUAGE "English"
+
+; Install for all users: shortcuts, registry and $APPDATA resolve to
+; machine-wide locations. SetShellVarContext is only legal inside a function
+; or a section, hence the callbacks below.
+Function .onInit
+  SetShellVarContext all
+FunctionEnd
+
+Function un.onInit
+  SetShellVarContext all
+FunctionEnd
 
 Section "CSLVPN core (relay + client)" SEC_CORE
   SectionIn RO
@@ -134,6 +143,7 @@ Section "Desktop shortcuts"
 SectionEnd
 
 Section "Uninstall"
+  SetShellVarContext all
   nsExec::ExecToLog 'sc.exe stop ${SERVICE}'
   nsExec::ExecToLog 'sc.exe delete ${SERVICE}'
   nsExec::ExecToLog 'netsh advfirewall firewall delete rule name="CSLVPN relay UDP"'
