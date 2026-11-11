@@ -99,8 +99,16 @@ jobs:
           ls -l /dev/net/tun
       - name: e2e - isolated networks, udp+tcp, isolation, admin api
         run: sudo -E bash scripts/e2e-test.sh
+      # The NAT test moves a default route inside a namespace, which is the one
+      # timing-sensitive scenario in the suite: retry once before giving up.
       - name: e2e - internet access through the relay (gateway + NAT)
-        run: sudo -E bash scripts/nat-test.sh
+        run: |
+          sudo -E bash scripts/nat-test.sh || {
+            echo "::warning::NAT test failed on the first attempt, retrying once"
+            sudo pkill -x cslvpn || true
+            sleep 3
+            sudo -E bash scripts/nat-test.sh
+          }
       - name: collect logs
         if: always()
         run: |

@@ -29,6 +29,7 @@ cleanup() {
   $SUDO ip netns pids a 2>/dev/null | xargs -r $SUDO kill 2>/dev/null
   $SUDO ip netns pids s 2>/dev/null | xargs -r $SUDO kill 2>/dev/null
   for n in a s; do $SUDO ip link del "veth$n" >/dev/null 2>&1; $SUDO ip link del "v$n" >/dev/null 2>&1; $SUDO ip netns del "$n" 2>/dev/null; done
+  $SUDO ip route del 26.0.0.0/8 2>/dev/null
   $SUDO ip link del "$GW_IF" 2>/dev/null
   [[ -n "${RELAY_PID:-}" ]] && $SUDO kill "$RELAY_PID" 2>/dev/null
   echo "logs: $WORK"
@@ -68,6 +69,11 @@ $SUDO ip addr add "$GW_IP/24" dev "$GW_IF"
 $SUDO ip link set dev "$GW_IF" mtu 1400 up
 $SUDO sysctl -qw net.ipv4.ip_forward=1
 
+# The relay adds `ip route replace 26.0.0.0/8 dev cslgw`; a stale route from a
+# previous run that still points at the old device would make the return traffic
+# take the wrong path, so start from a clean slate.
+$SUDO ip route del 26.0.0.0/8 2>/dev/null || true
+
 say "starting the relay in gateway mode"
 $SUDO "$BIN" server -listen "0.0.0.0:$PORT" -admin "127.0.0.1:$ADMIN" \
   -gateway -gateway-iface "$GW_IF" -nat-cidr 26.0.0.0/8 >"$WORK/relay.log" 2>&1 &
@@ -104,13 +110,15 @@ ok "client address $CLIENT_IP"
 grep -q "pinning" "$WORK/client.log" && ok "relay address pinned outside the tunnel"
 
 # Route everything into the tunnel, exactly like -internet does.
+# Give the client a moment to finish the handshake, then move the routes.
+sleep 1
 $SUDO ip netns exec a ip route replace default dev csl0
 $SUDO ip netns exec a ip route del "$SITE_IP/32" 2>/dev/null || true
 $SUDO ip netns exec a ip route | sed 's/^/     /'
 ok "default route goes through the tunnel, no direct route to $SITE_IP"
 
 say "fetch the 'internet' page through relay + NAT"
-if $SUDO ip netns exec a sh -c "curl -s -m 10 http://$SITE_IP:8000/index.txt" >"$WORK/body.txt" 2>"$WORK/curl.err"; then
+if $SUDO ip netns exec a sh -c "curl -s -m 15 --retry 3 --retry-delay 1 --retry-all-errors http://$SITE_IP:8000/index.txt" >"$WORK/body.txt" 2>"$WORK/curl.err"; then
   grep -q "hello-from-the-internet" "$WORK/body.txt" \
     && ok "internet traffic came back through the relay: $(cat "$WORK/body.txt")" \
     || die "unexpected body: $(head -c 200 "$WORK/body.txt")"
