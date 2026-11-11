@@ -227,14 +227,21 @@ jobs:
           # every path is handed over absolute (quoted, the workspace has spaces).
           $root = $env:GITHUB_WORKSPACE
           $out = Join-Path $root "pkg\cslvpn-${{ steps.meta.outputs.version }}-windows-amd64-setup.exe"
-          & "C:\Program Files (x86)\NSIS\makensis.exe" /V2 `
+          # MSI first: makensis must not fail silently on an already used pkg dir
+          $makensis = "C:\Program Files (x86)\NSIS\makensis.exe"
+          if (-not (Test-Path $makensis)) { throw "makensis not found at $makensis" }
+          & $makensis /V2 /WX `
             "/DVERSION=${{ steps.meta.outputs.version }}" `
             "/DSRC=$(Join-Path $root 'build\cslvpn.exe')" `
             "/DARCH=amd64" `
             "/DOUT=$out" `
             "/DPROJECT=$root" `
             "$(Join-Path $root 'packaging\nsis\cslvpn.nsi')" *>&1 | Tee-Object nsis.log
-          if ($LASTEXITCODE -ne 0) { Get-Content nsis.log -Tail 40; throw "makensis failed: $LASTEXITCODE" }
+          if ($LASTEXITCODE -ne 0) {
+            Get-Content nsis.log -Tail 40 | ForEach-Object { Write-Host "::error::nsis: $_" }
+            throw "makensis failed: $LASTEXITCODE"
+          }
+          if (-not (Test-Path $out)) { throw "makensis reported success but $out is missing" }
           Get-ChildItem pkg
 
       - name: install MSI silently and smoke test
