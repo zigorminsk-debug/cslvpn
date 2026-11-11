@@ -137,7 +137,7 @@ Section "Windows service (relay, auto start)" SEC_SERVICE
   nsExec::ExecToLog 'sc.exe start ${SERVICE}'
 SectionEnd
 
-Section "Desktop shortcuts"
+Section "Desktop shortcuts" SEC_USER_DESKTOP
   CreateShortcut "$DESKTOP\CSLVPN relay.lnk" "$SYSDIR\cmd.exe" \
     '/k "$INSTDIR\cslvpn.exe" server -listen :7777 -admin 127.0.0.1:7778' "$INSTDIR\cslvpn.exe" 0
 SectionEnd
@@ -178,5 +178,5 @@ LangString DESC_SEC_DESKTOP ${LANG_ENGLISH} "Desktop shortcut for the relay cons
   !insertmacro MUI_DESCRIPTION_TEXT ${SEC_CORE} $(DESC_SEC_CORE)
   !insertmacro MUI_DESCRIPTION_TEXT ${SEC_SHORTCUTS} $(DESC_SEC_SHORTCUTS)
   !insertmacro MUI_DESCRIPTION_TEXT ${SEC_SERVICE} $(DESC_SEC_SERVICE)
-  !insertmacro MUI_DESCRIPTION_TEXT ${SEC_DESKTOP} $(DESC_SEC_DESKTOP)
+  !insertmacro MUI_DESCRIPTION_TEXT ${SEC_USER_DESKTOP} $(DESC_SEC_DESKTOP)
 !insertmacro MUI_FUNCTION_DESCRIPTION_END
