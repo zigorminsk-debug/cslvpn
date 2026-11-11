@@ -402,9 +402,17 @@ jobs:
           merge-multiple: true
       - name: checksums
         run: |
+          set -x
+          ls -lR dist || true
           cd dist
-          ls -lh
-          sha256sum * > SHA256SUMS-packages.txt
+          # only regular files: download-artifact may leave directory entries
+          files=$(find . -maxdepth 1 -type f -printf '%f\n' | sort)
+          echo "files: $files"
+          if [ -z "$files" ]; then echo "::error::no package artifacts were downloaded"; exit 1; fi
+          if ! sha256sum $files > SHA256SUMS-packages.txt 2>sum.err; then
+            echo "::error::sha256sum failed: $(tr '\n' ' ' < sum.err)"
+            exit 1
+          fi
           cat SHA256SUMS-packages.txt
       - name: upload to the release
         uses: softprops/action-gh-release@v3
