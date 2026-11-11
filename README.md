@@ -34,6 +34,48 @@ sha256sum -c SHA256SUMS-linux-amd64.txt
 chmod +x cslvpn-linux-amd64 && sudo mv cslvpn-linux-amd64 /usr/local/bin/cslvpn
 ```
 
+### Установочные пакеты
+
+К релизу прикладываются готовые пакеты (`packages-*`, workflow `packages`).
+Каждый пакет в CI распаковывается и проверяется: установка, `cslvpn version`,
+запуск ретранслятора и ответ админ-API; для Windows — silent install и
+uninstall через `msiexec`/`/S`.
+
+| Платформа | Файл | Установка |
+|---|---|---|
+| Debian/Ubuntu | `cslvpn_<ver>_amd64.deb` (также arm64, armv7) | `sudo dpkg -i cslvpn_*.deb` |
+| RHEL/Fedora/openSUSE | `cslvpn-<ver>-1.x86_64.rpm` | `sudo rpm -Uvh cslvpn-*.rpm` |
+| Alpine | `cslvpn_<ver>_x86_64.apk` | `sudo apk add --allow-untrusted cslvpn_*.apk` |
+| Linux (без пакетного менеджера) | `cslvpn-<ver>-linux-<arch>.tar.gz` | `tar -xzf … ; sudo install -m755 cslvpn /usr/local/bin/` |
+| Windows | `cslvpn-<ver>-windows-amd64.msi` | `msiexec /i cslvpn-*.msi` (тихо: `/qn`) |
+| Windows (альтернатива) | `cslvpn-<ver>-windows-amd64-setup.exe` | двойной клик или `setup.exe /S` |
+| macOS | `cslvpn-<ver>-macos-<arch>.pkg` | `sudo installer -pkg cslvpn-*.pkg -target /` |
+
+Что ставится:
+
+* `/usr/bin/cslvpn` (Windows: `C:\Program Files\CSLVPN\cslvpn.exe`,
+  macOS: `/usr/local/bin/cslvpn`);
+* systemd-юниты `cslvpn.service` (ретранслятор) и `cslvpn-client.service`
+  (клиент) — macOS: `/Library/LaunchDaemons/io.cslvpn.relay.plist`,
+  Windows: служба `cslvpn-relay` (создаётся опцией установщика);
+* образцы конфигов `/etc/cslvpn/{server,client}.env.example`
+  (Windows: `%ProgramData%\CSLVPN\`, права 0640, реальные `*.env` не
+  перезаписываются при обновлении и не удаляются при удалении пакета);
+* документация `/usr/share/doc/cslvpn/`.
+
+Быстрый старт после установки пакета:
+
+```bash
+sudo cp /etc/cslvpn/server.env.example /etc/cslvpn/server.env   # при необходимости
+sudo systemctl enable --now cslvpn.service
+curl -s http://127.0.0.1:7778/api/v1/health     # {"status": "ok"}
+sudo cslvpn client -server <IP-сервера>:7777 -network office -password secret -transport tcp
+```
+
+Пакеты собираются автоматически на каждый push (workflow `packages`), поэтому
+артефакты последней сборки всегда лежат во вкладке Actions; в релиз они
+попадают при пуше тега `v*`. Локальная сборка — `packaging/README.md`.
+
 ## Что умеет
 
 * **Изолированные сети по имени и паролю.** Разные сети не видят друг друга
@@ -66,6 +108,7 @@ chmod +x cslvpn-linux-amd64 && sudo mv cslvpn-linux-amd64 /usr/local/bin/cslvpn
 | [docs/WINDOWS.md](docs/WINDOWS.md) | особенности Windows (адаптер, Wintun, служба) |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | что сделано и что дальше (P2P, L2, GUI) |
 | [docs/DEVELOPMENT-LOG.md](docs/DEVELOPMENT-LOG.md) | журнал разработки: решения, найденные ошибки, как проверялось |
+| [packaging/README.md](packaging/README.md) | установочные пакеты: что ставится, локальная сборка, грабли nfpm/NSIS/WiX |
 
 ## Сборка и тесты
 

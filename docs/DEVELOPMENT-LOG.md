@@ -168,3 +168,57 @@ runner'ов из песочницы недоступны (сеть закрыт�
 
 См. `docs/ROADMAP.md`: батчинг UDP, P2P hole punching с fallback,
 L2/широковещание для игр, Windows-адаптер из коробки, GUI, метрики.
+
+## Этап 7. Установочные пакеты (deb/rpm/apk, MSI, setup.exe, pkg)
+
+Цель: кроме «голых» бинарников дать пользователю штатные установщики, а
+сборку и **проверку установкой** делать автоматически на каждый push.
+
+Что добавлено:
+
+* `.github/workflows/packages.yml` — матрица `linux amd64/arm64/arm7`,
+  `windows amd64`, `macos arm64/amd64` + job `release`, который при пуше
+  тега `v*` прикладывает пакеты и `SHA256SUMS-packages.txt` к релизу.
+* `packaging/nfpm.yaml` — deb/rpm/apk: бинарник, два systemd-юнита, образцы
+  конфигов (`/etc/cslvpn/*.example`, 0640), документация, postinstall и
+  preremove.
+* `packaging/nsis/cslvpn.nsi` (setup.exe) и `packaging/wix/cslvpn.wxs` (MSI):
+  per-machine установка, PATH, меню «Пуск», запись в Add/Remove Programs,
+  правила брандмауэра для 7777/udp и 7777/tcp, опциональная служба
+  `cslvpn-relay`.
+* `packaging/macos/build-pkg.sh` — `pkgbuild` + `LaunchDaemon`
+  `io.cslvpn.relay.plist` (устанавливается выключенным).
+* `packaging/README.md` — что куда ставится, как собрать локально и список
+  уже собранных грабель.
+
+Каждый пакет в CI не просто собирается, но и проверяется: `dpkg -i` →
+`cslvpn version` → `systemd-analyze verify` юнитов → запуск ретранслятора и
+`GET /api/v1/health` → `dpkg -r` с проверкой, что `/etc/cslvpn` остался;
+`msiexec /i … /qn` (и `/x`), `setup.exe /S` (и `uninstall.exe /S`),
+`installer -pkg` на macOS.
+
+Отладка заняла восемь прогонов, потому что логи job'ов в песочницу не
+скачиваются — ошибки вытаскивались через `check-runs/<id>/annotations`
+(`gh run view --log` недоступен). Найденные и исправленные проблемы:
+
+1. nfpm v2: нет полей `keywords` и `overrides.{rpm,apk}.arch`; `version_schema:
+   none` вместо semver (версия CI — `0.0.<run>`).
+2. MSI не принимает версию с суффиксом `-<sha>` → единая схема `0.0.<run>`;
+   для NSIS версия дополняется до `0.0.<run>.0` в `VIProductVersion`.
+3. WiX: комментарии `;` в начале `.wxs` → `WIX0104`; заменены на `<!-- -->`.
+   `ComponentRef` ссылался на группу `Docs` вместо компонента `DocsComponent`.
+4. NSIS: относительные пути `File`/`OutFile` разрешаются от каталога
+   скрипта → дефайн `${PROJECT}` с абсолютным корнем репозитория.
+   `$COMMONAPPDATA` не существует → `$APPDATA` в контексте all-users;
+   `SetShellVarContext` вне секции запрещён → `.onInit`/`un.onInit`;
+   у секции «Desktop shortcuts» не было id, на который ссылается
+   `MUI_DESCRIPTION_TEXT` → `SEC_USER_DESKTOP`; включён `/WX`, поэтому такие
+   предупреждения теперь падают сразу, а не молча.
+5. macOS-job вообще не стартовал: `macos-14` отключён в hosted-пуле
+   (`configuration 'macos-14-arm64-us-default' is not supported`) →
+   `macos-latest`.
+
+Итог: прогон `42968650209` — зелёный, 6 артефактов
+(`packages-linux-{amd64,arm64,arm7}`, `packages-windows-amd64`,
+`packages-macos-{arm64,amd64}`); установка/удаление проверены на всех трёх
+семействах ОС.
