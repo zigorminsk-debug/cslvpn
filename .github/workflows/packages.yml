@@ -134,6 +134,11 @@ jobs:
           sudo dpkg -i pkg/*.deb
           test -x /usr/bin/cslvpn
           cslvpn version
+          # postinstall must have materialised the configs from the examples,
+          # otherwise "systemctl enable --now" from the guide would fail.
+          test -f /etc/cslvpn/server.env
+          test -f /etc/cslvpn/client.env
+          sudo test "$(stat -c %a /etc/cslvpn/client.env)" = "600"
           cslvpn server -h >/dev/null 2>&1 || true
           # units must be valid for systemd
           if command -v systemd-analyze >/dev/null; then

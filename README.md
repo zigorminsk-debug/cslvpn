@@ -21,6 +21,10 @@ sudo cslvpn client -server 203.0.113.10:7777 -network office -password s3cret -t
 После подключения машины видят друг друга по адресам `26.x.y.z` — как в одной
 локальной сети: ping, SMB, RDP, игры, HTTP, SSH.
 
+> **Развернуть с нуля?** Пошаговая инструкция от пустого VPS до рабочей сети
+> (порты, установка пакетом/бинарником/Docker, служба, клиенты Windows и
+> Linux/macOS, проверка изоляции, диагностика) — [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+
 ## Скачать готовые сборки
 
 Релизы с бинарниками (Windows/Linux/macOS, amd64/arm64/armv7) и контрольными
@@ -107,7 +111,8 @@ sudo cslvpn client -server <IP-сервера>:7777 -network office -password se
 |---|---|
 | [docs/RADMIN-VPN-ANALYSIS.md](docs/RADMIN-VPN-ANALYSIS.md) | разбор архитектуры Radmin VPN и что/как воспроизводит CSLVPN |
 | [docs/PROTOCOL.md](docs/PROTOCOL.md) | проводной протокол v1 (кадры, рукопожатие, ключи, ошибки) |
-| [docs/SERVER.md](docs/SERVER.md) | развёртывание ретранслятора, systemd, Docker, режим шлюза, мониторинг |
+| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | **инструкция по развёртыванию с нуля**: VPS → служба → клиенты → проверка → диагностика |
+| [docs/SERVER.md](docs/SERVER.md) | справочник по ретранслятору: флаги, systemd, Docker, режим шлюза, админ-API, мониторинг |
 | [docs/CLIENT.md](docs/CLIENT.md) | установка и использование клиента, диагностика |
 | [docs/WINDOWS.md](docs/WINDOWS.md) | особенности Windows (адаптер, Wintun, служба) |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | что сделано и что дальше (P2P, L2, GUI) |

@@ -26,8 +26,10 @@ Linux (deb/rpm/apk):
 /usr/share/doc/cslvpn/{README.md,LICENSE,docs/,examples/}
 ```
 
-`postinstall` делает `systemctl daemon-reload` и печатает подсказку, но
-**не включает** сервисы: сначала нужно править `/etc/cslvpn/*.env`.
+`postinstall` делает `systemctl daemon-reload`, создаёт `/etc/cslvpn/*.env`
+из образцов (0600, только если файла ещё нет — при обновлении конфиг не
+перезаписывается) и печатает подсказку, но **не включает** сервисы: сначала
+нужно править `/etc/cslvpn/*.env`.
 `preremove` останавливает и отключает юниты. Каталог `/etc/cslvpn`
 намеренно не удаляется — конфигурация переживает удаление пакета.
 

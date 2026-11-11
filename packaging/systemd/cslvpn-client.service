@@ -13,6 +13,8 @@ Type=simple
 Environment=CSLVPN_NETWORK=office
 Environment=CSLVPN_TRANSPORT=tcp
 Environment=CSLVPN_MEMBER=%H
+# Interface name must never be empty: keep a default before the config file.
+Environment=CSLVPN_IFACE=cslvpn0
 EnvironmentFile=/etc/cslvpn/client.env
 ExecStart=/usr/bin/cslvpn client \
     -server ${CSLVPN_SERVER} \
