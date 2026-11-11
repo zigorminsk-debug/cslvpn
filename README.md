@@ -21,6 +21,19 @@ sudo cslvpn client -server 203.0.113.10:7777 -network office -password s3cret -t
 После подключения машины видят друг друга по адресам `26.x.y.z` — как в одной
 локальной сети: ping, SMB, RDP, игры, HTTP, SSH.
 
+## Скачать готовые сборки
+
+Релизы с бинарниками (Windows/Linux/macOS, amd64/arm64/armv7) и контрольными
+суммами: [Releases](https://github.com/zigorminsk-debug/cslvpn/releases).
+
+```bash
+# Linux x86_64
+curl -LO https://github.com/zigorminsk-debug/cslvpn/releases/latest/download/cslvpn-linux-amd64
+curl -LO https://github.com/zigorminsk-debug/cslvpn/releases/latest/download/SHA256SUMS-linux-amd64.txt
+sha256sum -c SHA256SUMS-linux-amd64.txt
+chmod +x cslvpn-linux-amd64 && sudo mv cslvpn-linux-amd64 /usr/local/bin/cslvpn
+```
+
 ## Что умеет
 
 * **Изолированные сети по имени и паролю.** Разные сети не видят друг друга
@@ -64,8 +77,9 @@ sudo bash scripts/nat-test.sh        # интернет через ретран�
 ```
 
 CI (`.github/workflows/build.yml`) на каждый push: `gofmt`, `go vet`,
-`go test -race`, e2e в network namespaces, кросс-сборка под 7 платформ и
-публикация артефактов/релиза.
+`go test`, race-детектор, e2e в network namespaces (сети + UDP/TCP + изоляция +
+NAT), кросс-сборка под 7 платформ. Пуш тега `v*` публикует релиз с бинарниками
+и `SHA256SUMS`; пуш в `main` — ночной (prerelease) релиз.
 
 ## Архитектура
 

@@ -194,9 +194,12 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v7
+      # Only the binaries and checksums: e2e logs are artifacts too, but they
+      # must never end up in a release.
       - uses: actions/download-artifact@v8
         with:
           path: dist
+          pattern: cslvpn-*
           merge-multiple: true
       - name: list artifacts
         run: ls -lh dist
