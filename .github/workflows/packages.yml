@@ -303,7 +303,8 @@ jobs:
   # ----------------------------------------------------------------- macOS ---
   macos:
     name: macos pkg (${{ matrix.arch }})
-    runs-on: macos-14
+    # macos-14 is retired on hosted runners; latest is the supported label
+    runs-on: macos-latest
     strategy:
       fail-fast: false
       matrix:

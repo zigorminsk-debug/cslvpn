@@ -44,6 +44,8 @@ OutFile "${OUT}"
 InstallDir "$PROGRAMFILES64\CSLVPN"
 InstallDirRegKey HKLM "Software\CSLVPN" "InstallDir"
 RequestExecutionLevel admin
+; install for all users: shortcuts, registry and $APPDATA point at all-users paths
+SetShellVarContext all
 SetCompressor /SOLID lzma
 BrandingText "${APPNAME} - isolated virtual LANs over UDP/TCP"
 
@@ -77,8 +79,9 @@ Section "CSLVPN core (relay + client)" SEC_CORE
   File "${PROJECT}\docs\CLIENT.md"
   File "${PROJECT}\docs\WINDOWS.md"
 
-  ; NSIS supports shipped languages only; keep the installer translatable.
-  SetOutPath "$COMMONAPPDATA\CSLVPN"
+  ; Config templates go to C:\ProgramData\CSLVPN (all-users context, so
+  ; $APPDATA resolves to $PROGRAMDATA instead of the per-user folder).
+  SetOutPath "$APPDATA\CSLVPN"
   File "${PROJECT}\packaging\config\server.env.example"
   File "${PROJECT}\packaging\config\client.env.example"
 
