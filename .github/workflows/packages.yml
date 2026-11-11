@@ -182,9 +182,12 @@ jobs:
         env:
           INPUT_VERSION: ${{ inputs.version }}
         run: |
+          # Same scheme as the other jobs: NSIS needs a numeric X.X.X.X version
+          # (VIProductVersion) and MSI three numeric parts below 65536, so a
+          # git-sha suffix is not an option.
           $v = if ($env:INPUT_VERSION) { $env:INPUT_VERSION }
                elseif ($env:GITHUB_REF -like 'refs/tags/*') { $env:GITHUB_REF_NAME -replace '^v','' }
-               else { "0.0.0-" + $env:GITHUB_SHA.Substring(0,7) }
+               else { "0.0." + $env:GITHUB_RUN_NUMBER }
           "version=$v" >> $env:GITHUB_OUTPUT
           Write-Host "packaging $v"
 
