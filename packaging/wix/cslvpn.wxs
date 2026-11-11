@@ -1,14 +1,15 @@
-; CSLVPN MSI package (WiX v4/v5).
-;
-; Built in CI with the WiX .NET tool:
-;   wix build -arch x64 -d Version=0.2.0 -d Src=build\cslvpn.exe \
-;             -d License=LICENSE -d Readme=docs\SERVER.md \
-;             -o pkg\cslvpn-0.2.0-windows-amd64.msi packaging\wix\cslvpn.wxs
-;
-; Result: per-machine MSI with a Start Menu shortcut, PATH entry and an
-; Add/Remove Programs entry. Silent install works:
-;   msiexec /i cslvpn-0.2.0-windows-amd64.msi /qn
+<!--
+     CSLVPN MSI package (WiX v4/v5).
 
+     Built in CI with the WiX .NET tool:
+       wix build -arch x64 -d Version=0.2.0 -d Src=build\cslvpn.exe \
+                 -d License=LICENSE -d Readme=docs\SERVER.md \
+                 -o pkg\cslvpn-0.2.0-windows-amd64.msi packaging\wix\cslvpn.wxs
+
+     Result: per-machine MSI with a Start Menu shortcut, PATH entry and an
+     Add/Remove Programs entry. Silent install works:
+       msiexec /i cslvpn-0.2.0-windows-amd64.msi /qn
+-->
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
   <Package Name="CSLVPN"
            Manufacturer="CSLVPN contributors"
