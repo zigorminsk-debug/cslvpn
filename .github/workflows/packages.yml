@@ -298,9 +298,12 @@ jobs:
         if: always()
         with:
           name: packages-windows-amd64
+          # build logs stay in the artifact; the release gets only packages
           path: |
             pkg/*
             msi-install.log
+            nsis.log
+            wix.log
           retention-days: 30
 
   # ----------------------------------------------------------------- macOS ---
