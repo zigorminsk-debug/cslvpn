@@ -1,0 +1,78 @@
+# nfpm configuration for the Linux packages (.deb, .rpm, .apk).
+#
+# Used by .github/workflows/packages.yml:
+#   nfpm package -f packaging/nfpm.yaml -p deb
+# The binary is expected at ./cslvpn (built by the workflow) and the version in
+# $VERSION; both are substituted by nfpm's environment expansion.
+#
+# Contents:
+#   /usr/bin/cslvpn                     - relay + client + status CLI
+#   /usr/lib/systemd/system/cslvpn*    - relay and client units
+#   /etc/cslvpn/*.example              - configuration examples
+#   /usr/share/doc/cslvpn/*            - docs and license
+name: cslvpn
+arch: ${ARCH}          # amd64 / arm64 / arm7 (Go style, nfpm maps per format)
+platform: linux
+version: ${VERSION}
+# deb/rpm/apk all accept plain x.y.z, which is what the workflow produces.
+version_schema: none
+# Versions come from git tags (1.2.3) or from CI as 0.0.<run number>.
+section: net
+priority: optional
+maintainer: CSLVPN contributors <cslvpn@users.noreply.github.com>
+description: |
+  Isolated virtual LANs over the internet with a self-hosted relay.
+  CSLVPN connects machines behind any NAT into private virtual networks
+  ("rooms") addressed as 26.x.y.z, isolated from each other, with per-frame
+  AES-256-GCM encryption and an explicit choice between the UDP and TCP
+  transports. One binary contains the relay server, the tunnel client and a
+  small administration CLI.
+vendor: CSLVPN
+homepage: https://github.com/zigorminsk-debug/cslvpn
+license: MIT
+provides:
+  - cslvpn
+conflicts:
+  - cslvpn-bin
+contents:
+  - src: ./cslvpn
+    dst: /usr/bin/cslvpn
+    file_info:
+      mode: 0755
+  - src: ./packaging/systemd/cslvpn.service
+    dst: /usr/lib/systemd/system/cslvpn.service
+    file_info:
+      mode: 0644
+  - src: ./packaging/systemd/cslvpn-client.service
+    dst: /usr/lib/systemd/system/cslvpn-client.service
+    file_info:
+      mode: 0644
+  - src: ./packaging/config/server.env.example
+    dst: /etc/cslvpn/server.env.example
+    file_info:
+      mode: 0640
+  - src: ./packaging/config/client.env.example
+    dst: /etc/cslvpn/client.env.example
+    file_info:
+      mode: 0640
+  - src: ./README.md
+    dst: /usr/share/doc/cslvpn/README.md
+  - src: ./LICENSE
+    dst: /usr/share/doc/cslvpn/LICENSE
+  - src: ./docs
+    dst: /usr/share/doc/cslvpn/docs
+  - src: ./scripts/e2e-test.sh
+    dst: /usr/share/doc/cslvpn/examples/e2e-test.sh
+    file_info:
+      mode: 0755
+  - src: ./scripts/nat-test.sh
+    dst: /usr/share/doc/cslvpn/examples/nat-test.sh
+    file_info:
+      mode: 0755
+scripts:
+  postinstall: ./packaging/scripts/postinstall.sh
+  preremove: ./packaging/scripts/preremove.sh
+
+# nfpm translates the Go-style architecture (amd64, arm64, arm7) into the
+# native names of each format (x86_64/aarch64/armv7hl, x86_64/aarch64/armv7,
+# amd64/arm64/armv7), so there is nothing to override per format here.

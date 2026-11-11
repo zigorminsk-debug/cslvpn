@@ -1,0 +1,40 @@
+[Unit]
+Description=CSLVPN tunnel client
+Documentation=https://github.com/zigorminsk-debug/cslvpn/blob/main/docs/CLIENT.md
+After=network-online.target
+Wants=network-online.target
+# Do not start without a configuration.
+ConditionPathExists=/etc/cslvpn/client.env
+
+[Service]
+Type=simple
+# The client creates a TUN device and changes routes, so it runs as root with a
+# minimal capability set.
+Environment=CSLVPN_NETWORK=office
+Environment=CSLVPN_TRANSPORT=tcp
+Environment=CSLVPN_MEMBER=%H
+# Interface name must never be empty: keep a default before the config file.
+Environment=CSLVPN_IFACE=cslvpn0
+EnvironmentFile=/etc/cslvpn/client.env
+ExecStart=/usr/bin/cslvpn client \
+    -server ${CSLVPN_SERVER} \
+    -network ${CSLVPN_NETWORK} \
+    -password ${CSLVPN_PASSWORD} \
+    -transport ${CSLVPN_TRANSPORT} \
+    -name ${CSLVPN_MEMBER} \
+    -iface ${CSLVPN_IFACE}
+Restart=always
+RestartSec=5
+
+User=root
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW
+NoNewPrivileges=no
+PrivateTmp=yes
+ProtectHome=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=no
+RestrictAddressFamilies=AF_INET AF_INET6 AF_NETLINK AF_UNIX
+LockPersonality=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,89 @@
+<!--
+     CSLVPN MSI package (WiX v4/v5).
+
+     Built in CI with the WiX .NET tool:
+       wix build -arch x64 -d Version=0.2.0 -d Src=build\cslvpn.exe \
+                 -d License=LICENSE -d Readme=docs\SERVER.md \
+                 -o pkg\cslvpn-0.2.0-windows-amd64.msi packaging\wix\cslvpn.wxs
+
+     Result: per-machine MSI with a Start Menu shortcut, PATH entry and an
+     Add/Remove Programs entry. Silent install works:
+       msiexec /i cslvpn-0.2.0-windows-amd64.msi /qn
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="CSLVPN"
+           Manufacturer="CSLVPN contributors"
+           Version="$(var.Version)"
+           UpgradeCode="6f1f4c62-6f7e-4b7b-9c0b-6c2f0e1a7d31"
+           Scope="perMachine"
+           Compressed="yes"
+           Language="1033">
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of CSLVPN is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <SummaryInformation Description="CSLVPN - isolated virtual LANs over UDP/TCP"
+                        Manufacturer="CSLVPN contributors" />
+
+    <Feature Id="Main" Title="CSLVPN" Level="1">
+      <ComponentGroupRef Id="Binaries" />
+      <ComponentRef Id="PathEnvironment" />
+      <ComponentRef Id="StartMenuShortcut" />
+      <ComponentRef Id="DocsComponent" />
+    </Feature>
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="CSLVPN">
+        <Component Id="PathEnvironment" Guid="a1b2c3d4-0001-4a1a-9a1a-000000000001">
+          <!-- Add the install directory to the machine PATH so `cslvpn` works
+               from any shell. -->
+          <Environment Id="PathEntry"
+                       Name="PATH"
+                       Value="[INSTALLFOLDER]"
+                       Permanent="no"
+                       Part="last"
+                       Action="set"
+                       System="yes" />
+          <RegistryValue Root="HKLM" Key="Software\CSLVPN" Name="InstallDir"
+                         Type="string" Value="[INSTALLFOLDER]" KeyPath="yes" />
+        </Component>
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="CslvpnMenu" Name="CSLVPN">
+        <Component Id="StartMenuShortcut" Guid="a1b2c3d4-0002-4a1a-9a1a-000000000002">
+          <Shortcut Id="RelayShortcut"
+                    Name="CSLVPN relay"
+                    Description="Start the relay server on UDP/TCP 7777"
+                    Target="[INSTALLFOLDER]cslvpn.exe"
+                    Arguments="server -listen :7777 -admin 127.0.0.1:7778"
+                    WorkingDirectory="INSTALLFOLDER" />
+          <Shortcut Id="ClientShortcut"
+                    Name="CSLVPN client"
+                    Description="Start the tunnel client"
+                    Target="[INSTALLFOLDER]cslvpn.exe"
+                    Arguments="client -server 127.0.0.1:7777 -network office -password secret -transport tcp"
+                    WorkingDirectory="INSTALLFOLDER" />
+          <RemoveFolder Id="RemoveCslvpnMenu" On="uninstall" />
+          <RegistryValue Root="HKCU" Key="Software\CSLVPN" Name="Menu" Type="integer"
+                         Value="1" KeyPath="yes" />
+        </Component>
+      </Directory>
+    </StandardDirectory>
+
+    <ComponentGroup Id="Binaries" Directory="INSTALLFOLDER">
+      <Component Id="MainExecutable" Guid="a1b2c3d4-0003-4a1a-9a1a-000000000003">
+        <File Id="CslvpnExe" Source="$(var.Src)" Name="cslvpn.exe" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <ComponentGroup Id="Docs" Directory="INSTALLFOLDER">
+      <Component Id="DocsComponent" Guid="a1b2c3d4-0004-4a1a-9a1a-000000000004">
+        <File Id="LicenseFile" Source="$(var.License)" Name="LICENSE" KeyPath="yes" />
+        <File Id="ReadmeFile" Source="$(var.Readme)" Name="SERVER.md" />
+      </Component>
+    </ComponentGroup>
+
+  </Package>
+</Wix>
