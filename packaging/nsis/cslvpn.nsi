@@ -28,6 +28,11 @@ Unicode true
 !ifndef ARCH
   !define ARCH "amd64"
 !endif
+; PROJECT is the repository root; CI passes it absolute because makensis
+; resolves relative paths against this script's directory.
+!ifndef PROJECT
+  !define PROJECT "..\.."
+!endif
 
 !define APPNAME "CSLVPN"
 !define COMPANY "CSLVPN contributors"
@@ -53,7 +58,7 @@ VIAddVersionKey "LegalCopyright" "MIT License"
 !define MUI_ABORTWARNING
 !define MUI_FINISHPAGE_SHOWREADME "$INSTDIR\SERVER.md"
 !insertmacro MUI_PAGE_WELCOME
-!insertmacro MUI_PAGE_LICENSE "..\..\LICENSE"
+!insertmacro MUI_PAGE_LICENSE "${PROJECT}\LICENSE"
 !insertmacro MUI_PAGE_COMPONENTS
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
@@ -66,16 +71,16 @@ Section "CSLVPN core (relay + client)" SEC_CORE
   SectionIn RO
   SetOutPath "$INSTDIR"
   File "/oname=cslvpn.exe" "${SRC}"
-  File "..\..\LICENSE"
-  File "..\..\README.md"
-  File "..\..\docs\SERVER.md"
-  File "..\..\docs\CLIENT.md"
-  File "..\..\docs\WINDOWS.md"
+  File "${PROJECT}\LICENSE"
+  File "${PROJECT}\README.md"
+  File "${PROJECT}\docs\SERVER.md"
+  File "${PROJECT}\docs\CLIENT.md"
+  File "${PROJECT}\docs\WINDOWS.md"
 
   ; NSIS supports shipped languages only; keep the installer translatable.
   SetOutPath "$COMMONAPPDATA\CSLVPN"
-  File "..\config\server.env.example"
-  File "..\config\client.env.example"
+  File "${PROJECT}\packaging\config\server.env.example"
+  File "${PROJECT}\packaging\config\client.env.example"
 
   WriteRegStr HKLM "Software\CSLVPN" "InstallDir" "$INSTDIR"
   WriteRegStr HKLM "Software\CSLVPN" "Version" "${VERSION}"

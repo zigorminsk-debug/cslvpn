@@ -37,18 +37,9 @@ jobs:
       matrix:
         include:
           - arch: amd64
-            nfpm_arch: amd64
-            rpm_arch: x86_64
-            apk_arch: x86_64
           - arch: arm64
-            nfpm_arch: arm64
-            rpm_arch: aarch64
-            apk_arch: aarch64
           - arch: arm7
             goarm: "7"
-            nfpm_arch: armv7
-            rpm_arch: armv7hl
-            apk_arch: armv7
     steps:
       - uses: actions/checkout@v7
 
@@ -98,9 +89,7 @@ jobs:
       - name: build deb, rpm, apk
         env:
           VERSION: ${{ steps.meta.outputs.version }}
-          ARCH: ${{ matrix.nfpm_arch }}
-          RPM_ARCH: ${{ matrix.rpm_arch }}
-          APK_ARCH: ${{ matrix.apk_arch }}
+          ARCH: ${{ matrix.arch }}
         run: |
           set -euo pipefail
           mkdir -p pkg
@@ -222,12 +211,18 @@ jobs:
       - name: build NSIS installer
         shell: pwsh
         run: |
+          # makensis resolves relative paths against the script directory, so
+          # every path is handed over absolute (quoted, the workspace has spaces).
+          $root = $env:GITHUB_WORKSPACE
+          $out = Join-Path $root "pkg\cslvpn-${{ steps.meta.outputs.version }}-windows-amd64-setup.exe"
           & "C:\Program Files (x86)\NSIS\makensis.exe" /V2 `
-            /DVERSION=${{ steps.meta.outputs.version }} `
-            /DSRC=build\cslvpn.exe `
-            /DARCH=amd64 `
-            /DOUT=pkg\cslvpn-${{ steps.meta.outputs.version }}-windows-amd64-setup.exe `
-            packaging\nsis\cslvpn.nsi
+            "/DVERSION=${{ steps.meta.outputs.version }}" `
+            "/DSRC=$(Join-Path $root 'build\cslvpn.exe')" `
+            "/DARCH=amd64" `
+            "/DOUT=$out" `
+            "/DPROJECT=$root" `
+            "$(Join-Path $root 'packaging\nsis\cslvpn.nsi')" *>&1 | Tee-Object nsis.log
+          if ($LASTEXITCODE -ne 0) { Get-Content nsis.log -Tail 40; throw "makensis failed: $LASTEXITCODE" }
           Get-ChildItem pkg
 
       - name: install MSI silently and smoke test

@@ -79,7 +79,7 @@
 
     <ComponentGroup Id="Docs" Directory="INSTALLFOLDER">
       <Component Id="DocsComponent" Guid="a1b2c3d4-0004-4a1a-9a1a-000000000004">
-        <File Id="LicenseFile" Source="$(var.License)" Name="LICENSE" />
+        <File Id="LicenseFile" Source="$(var.License)" Name="LICENSE" KeyPath="yes" />
         <File Id="ReadmeFile" Source="$(var.Readme)" Name="SERVER.md" />
       </Component>
     </ComponentGroup>

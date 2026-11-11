@@ -11,7 +11,7 @@
 #   /etc/cslvpn/*.example              - configuration examples
 #   /usr/share/doc/cslvpn/*            - docs and license
 name: cslvpn
-arch: ${ARCH}          # amd64 / arm64 / armv7 -> mapped by the workflow
+arch: ${ARCH}          # amd64 / arm64 / arm7 (Go style, nfpm maps per format)
 platform: linux
 version: ${VERSION}
 # deb/rpm/apk all accept plain x.y.z, which is what the workflow produces.
@@ -30,12 +30,6 @@ description: |
 vendor: CSLVPN
 homepage: https://github.com/zigorminsk-debug/cslvpn
 license: MIT
-keywords:
-  - vpn
-  - vlan
-  - overlay
-  - nat-traversal
-  - mesh
 provides:
   - cslvpn
 conflicts:
@@ -79,12 +73,6 @@ scripts:
   postinstall: ./packaging/scripts/postinstall.sh
   preremove: ./packaging/scripts/preremove.sh
 
-overrides:
-  rpm:
-    # RPM wants the architecture names of the distribution.
-    arch: ${RPM_ARCH}
-    scripts:
-      postinstall: ./packaging/scripts/postinstall.sh
-      preremove: ./packaging/scripts/preremove.sh
-  apk:
-    arch: ${APK_ARCH}
+# nfpm translates the Go-style architecture (amd64, arm64, arm7) into the
+# native names of each format (x86_64/aarch64/armv7hl, x86_64/aarch64/armv7,
+# amd64/arm64/armv7), so there is nothing to override per format here.
