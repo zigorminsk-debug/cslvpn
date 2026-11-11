@@ -403,6 +403,18 @@ jobs:
           path: dist
           pattern: packages-*
           merge-multiple: true
+      - name: flatten artifacts
+        run: |
+          set -x
+          # upload-artifact keeps the common parent directory, so a job that
+          # uploads "pkg/*" plus root logs produces dist/pkg/*.msi and
+          # dist/msi-install.log. Flatten everything into dist/ and drop logs:
+          # they belong to the run artifacts, not to the release.
+          find dist -mindepth 2 -type f -exec mv -ft dist {} +
+          find dist -mindepth 1 -type d -empty -delete
+          rm -f dist/*.log
+          ls -l dist
+
       - name: checksums
         run: |
           set -x
