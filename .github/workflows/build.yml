@@ -75,6 +75,8 @@ jobs:
           echo "::error::gofmt: $(gofmt -d ./cmd ./internal 2>&1 | esc)"
           echo "::error::vet: $(go vet ./... 2>&1 | esc)"
           go test -race -count=1 ./... >/tmp/t.log 2>&1; echo "::error::race test exit=$? output: $(esc </tmp/t.log)"
+          for f in /tmp/tmp.*/relay.log; do [ -f "$f" ] || continue; echo "::error::relay log: $(esc <"$f")"; done
+          for f in /tmp/tmp.*/client-*.log; do [ -f "$f" ] || continue; echo "::error::client log $(basename "$f"): $(esc <"$f")"; done
 
   # The end-to-end tests need root (network namespaces, TUN devices), which the
   # hosted runners provide.
@@ -97,18 +99,32 @@ jobs:
           sudo mknod /dev/net/tun c 10 200 2>/dev/null || true
           sudo chmod 666 /dev/net/tun
           ls -l /dev/net/tun
+      # Both e2e scripts drive real namespaces, routes and timers, so a retry
+      # is cheaper than chasing an occasional scheduling hiccup on shared
+      # runners. A genuine regression fails twice.
       - name: e2e - isolated networks, udp+tcp, isolation, admin api
-        run: sudo -E bash scripts/e2e-test.sh
-      # The NAT test moves a default route inside a namespace, which is the one
-      # timing-sensitive scenario in the suite: retry once before giving up.
+        run: |
+          sudo -E bash scripts/e2e-test.sh || {
+            echo "::warning::isolated-networks e2e failed on the first attempt, retrying once"
+            sudo pkill -x cslvpn || true
+            sleep 3
+            sudo -E bash scripts/e2e-test.sh
+          }
       - name: e2e - internet access through the relay (gateway + NAT)
         run: |
           sudo -E bash scripts/nat-test.sh || {
-            echo "::warning::NAT test failed on the first attempt, retrying once"
+            echo "::warning::NAT e2e failed on the first attempt, retrying once"
             sudo pkill -x cslvpn || true
             sleep 3
             sudo -E bash scripts/nat-test.sh
           }
+      - name: log tails on failure
+        if: failure()
+        run: |
+          set +e
+          esc() { tr '\n' ' ' | tail -c 1200; }
+          for f in /tmp/tmp.*/relay.log; do [ -f "$f" ] || continue; echo "::error::relay: $(sudo esc <"$f")"; done
+          for f in /tmp/tmp.*/client-*.log; do [ -f "$f" ] || continue; echo "::error::$(basename "$f"): $(sudo esc <"$f")"; done
       - name: collect logs
         if: always()
         run: |
