@@ -409,8 +409,13 @@ jobs:
           files=$(find . -maxdepth 1 -type f -printf '%f\n' | sort)
           echo "files: $files"
           if [ -z "$files" ]; then echo "::error::no package artifacts were downloaded"; exit 1; fi
-          if ! sha256sum $files > SHA256SUMS-packages.txt 2>sum.err; then
-            echo "::error::sha256sum failed: $(tr '\n' ' ' < sum.err)"
+          # stderr must go outside dist/: GitHub rejects 0-byte release assets
+          if ! sha256sum $files > SHA256SUMS-packages.txt 2>"$RUNNER_TEMP/sum.err"; then
+            echo "::error::sha256sum failed: $(tr '\n' ' ' < "$RUNNER_TEMP/sum.err")"
+            exit 1
+          fi
+          if find . -maxdepth 1 -type f -empty | grep -q .; then
+            echo "::error::dist contains empty files: $(find . -maxdepth 1 -type f -empty -printf '%f ')"
             exit 1
           fi
           cat SHA256SUMS-packages.txt
