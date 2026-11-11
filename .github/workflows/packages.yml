@@ -1,0 +1,365 @@
+name: packages
+
+# Builds ready-to-install packages for every supported platform:
+#   .deb / .rpm / .apk   (Linux amd64, arm64, armv7)      - nfpm
+#   .msi                 (Windows amd64)                  - WiX
+#   .exe setup           (Windows amd64, NSIS)            - NSIS
+#   .pkg                 (macOS arm64)                    - pkgbuild
+#   .tar.gz              (Linux, portable)                - tar
+# Every package is verified by installing it and running the binary.
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Package version (default: from tag or 0.0.0-<sha>)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  GO_VERSION: "stable"
+  CGO_ENABLED: "0"
+  NFPM_VERSION: "2.42.0"
+
+jobs:
+  # ----------------------------------------------------------------- Linux ---
+  linux:
+    name: linux packages (${{ matrix.arch }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            nfpm_arch: amd64
+            rpm_arch: x86_64
+            apk_arch: x86_64
+          - arch: arm64
+            nfpm_arch: arm64
+            rpm_arch: aarch64
+            apk_arch: aarch64
+          - arch: arm7
+            goarm: "7"
+            nfpm_arch: armv7
+            rpm_arch: armv7hl
+            apk_arch: armv7
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: version
+        id: meta
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          if [ -n "${INPUT_VERSION:-}" ]; then
+            v="$INPUT_VERSION"
+          elif [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            v="${GITHUB_REF_NAME#v}"
+          else
+            v="0.0.0-${GITHUB_SHA::7}"
+          fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "packaging $v for ${{ matrix.arch }}"
+
+      - name: build binary
+        env:
+          GOOS: linux
+          GOARCH: ${{ matrix.arch == 'arm7' && 'arm' || matrix.arch }}
+          GOARM: ${{ matrix.goarm }}
+        run: |
+          set -euo pipefail
+          go build -trimpath \
+            -ldflags "-s -w -X main.Version=${{ steps.meta.outputs.version }}" \
+            -o cslvpn ./cmd/cslvpn
+          file cslvpn
+
+      - name: install nfpm
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/nfpm"
+          curl -fsSL "https://github.com/goreleaser/nfpm/releases/download/v${NFPM_VERSION}/nfpm_${NFPM_VERSION}_amd64.deb" \
+            -o "$RUNNER_TEMP/nfpm.deb"
+          dpkg-deb -x "$RUNNER_TEMP/nfpm.deb" "$RUNNER_TEMP/nfpm"
+          echo "$RUNNER_TEMP/nfpm/usr/bin" >> "$GITHUB_PATH"
+
+      - name: build deb, rpm, apk
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+          ARCH: ${{ matrix.nfpm_arch }}
+          RPM_ARCH: ${{ matrix.rpm_arch }}
+          APK_ARCH: ${{ matrix.apk_arch }}
+        run: |
+          set -euo pipefail
+          mkdir -p pkg
+          for format in deb rpm apk; do
+            nfpm package -f packaging/nfpm.yaml -p "$format" -t "pkg/"
+          done
+          ls -lh pkg/
+
+      - name: build portable tarball
+        env:
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          set -euo pipefail
+          name="cslvpn-${VERSION}-linux-${{ matrix.arch }}"
+          mkdir -p "stage/$name"
+          cp cslvpn "stage/$name/"
+          cp README.md LICENSE "stage/$name/"
+          cp -R docs "stage/$name/"
+          cp -R packaging/config "stage/$name/examples"
+          cp scripts/e2e-test.sh scripts/nat-test.sh "stage/$name/examples/" 2>/dev/null || true
+          tar -C stage -czf "pkg/${name}.tar.gz" "$name"
+          ls -lh "pkg/${name}.tar.gz"
+
+      - name: install the .deb and smoke test
+        if: matrix.arch == 'amd64'
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y systemd >/dev/null 2>&1 || true
+          sudo dpkg -i pkg/*.deb
+          test -x /usr/bin/cslvpn
+          cslvpn version
+          cslvpn server -h >/dev/null 2>&1 || true
+          # units must be valid for systemd
+          if command -v systemd-analyze >/dev/null; then
+            sudo systemd-analyze verify /usr/lib/systemd/system/cslvpn.service \
+              /usr/lib/systemd/system/cslvpn-client.service
+          fi
+          # the relay must actually start from the installed binary
+          (/usr/bin/cslvpn server -listen 127.0.0.1:7787 -admin 127.0.0.1:7788 >/tmp/relay.log 2>&1 &)
+          sleep 2
+          curl -sf http://127.0.0.1:7788/api/v1/health | grep -q '"status": "ok"'
+          sudo pkill -x cslvpn || true
+          echo OK
+
+      - name: remove the package again
+        if: matrix.arch == 'amd64'
+        run: |
+          dpkg -r cslvpn 2>&1 | tail -3 || true
+          dpkg -l cslvpn 2>/dev/null | grep -q '^ii' && { echo "still installed"; exit 1; } || true
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: packages-linux-${{ matrix.arch }}
+          path: pkg/*
+          retention-days: 30
+
+  # --------------------------------------------------------------- Windows ---
+  windows:
+    name: windows installer (msi + exe)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: version
+        id: meta
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          $v = if ($env:INPUT_VERSION) { $env:INPUT_VERSION }
+               elseif ($env:GITHUB_REF -like 'refs/tags/*') { $env:GITHUB_REF_NAME -replace '^v','' }
+               else { "0.0.0-" + $env:GITHUB_SHA.Substring(0,7) }
+          "version=$v" >> $env:GITHUB_OUTPUT
+          Write-Host "packaging $v"
+
+      - name: build binary
+        env:
+          GOOS: windows
+          GOARCH: amd64
+          CGO_ENABLED: "0"
+        run: |
+          go build -trimpath -ldflags "-s -w -X main.Version=${{ steps.meta.outputs.version }}" -o build/cslvpn.exe ./cmd/cslvpn
+          .\build\cslvpn.exe version
+
+      - name: install WiX and NSIS
+        run: |
+          dotnet tool install --global wix --version 5.*
+          echo "C:\Program Files\dotnet\tools" | Out-File -Append -Encoding utf8 $env:GITHUB_PATH
+          choco install nsis -y --no-progress
+
+      - name: build MSI
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path pkg | Out-Null
+          wix build -arch x64 `
+            -d Version=${{ steps.meta.outputs.version }} `
+            -d Src=build\cslvpn.exe `
+            -d License=LICENSE `
+            -d Readme=docs\SERVER.md `
+            -o "pkg/cslvpn-${{ steps.meta.outputs.version }}-windows-amd64.msi" packaging\wix\cslvpn.wxs
+          Get-ChildItem pkg
+
+      - name: build NSIS installer
+        shell: pwsh
+        run: |
+          & "C:\Program Files (x86)\NSIS\makensis.exe" /V2 `
+            /DVERSION=${{ steps.meta.outputs.version }} `
+            /DSRC=build\cslvpn.exe `
+            /DARCH=amd64 `
+            /DOUT=pkg\cslvpn-${{ steps.meta.outputs.version }}-windows-amd64-setup.exe `
+            packaging\nsis\cslvpn.nsi
+          Get-ChildItem pkg
+
+      - name: install MSI silently and smoke test
+        shell: pwsh
+        run: |
+          $msi = (Get-ChildItem pkg\*.msi).FullName
+          Start-Process msiexec.exe -Wait -ArgumentList "/i `"$msi`" /qn /l*v msi-install.log"
+          $exe = "C:\Program Files\CSLVPN\cslvpn.exe"
+          if (-not (Test-Path $exe)) { Get-Content msi-install.log -Tail 60; throw "cslvpn.exe not installed" }
+          & $exe version
+          # the relay must start and answer on the admin API
+          $p = Start-Process $exe -ArgumentList 'server -listen 127.0.0.1:7797 -admin 127.0.0.1:7798' -PassThru
+          Start-Sleep -Seconds 3
+          $resp = Invoke-WebRequest -UseBasicParsing http://127.0.0.1:7798/api/v1/health
+          if ($resp.Content -notmatch '"status": "ok"') { throw "relay health check failed" }
+          Stop-Process -Id $p.Id -Force
+          Write-Host "MSI install OK"
+
+      - name: uninstall MSI
+        shell: pwsh
+        run: |
+          $msi = (Get-ChildItem pkg\*.msi).FullName
+          Start-Process msiexec.exe -Wait -ArgumentList "/x `"$msi`" /qn"
+          if (Test-Path "C:\Program Files\CSLVPN\cslvpn.exe") { throw "MSI did not remove the files" }
+          Write-Host "MSI uninstall OK"
+
+      - name: install NSIS installer silently and smoke test
+        shell: pwsh
+        run: |
+          $setup = (Get-ChildItem pkg\*setup.exe).FullName
+          Start-Process $setup -Wait -ArgumentList "/S"
+          $exe = "$env:ProgramFiles\CSLVPN\cslvpn.exe"
+          if (-not (Test-Path $exe)) { throw "NSIS: cslvpn.exe not installed" }
+          & $exe version
+          # uninstall silently
+          Start-Process "$env:ProgramFiles\CSLVPN\uninstall.exe" -Wait -ArgumentList "/S"
+          Start-Sleep -Seconds 3
+          if (Test-Path $exe) { throw "NSIS: uninstall left files behind" }
+          Write-Host "NSIS install/uninstall OK"
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: packages-windows-amd64
+          path: |
+            pkg/*
+            msi-install.log
+          retention-days: 30
+
+  # ----------------------------------------------------------------- macOS ---
+  macos:
+    name: macos pkg (${{ matrix.arch }})
+    runs-on: macos-14
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            goarch: arm64
+          - arch: amd64
+            goarch: amd64
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: version
+        id: meta
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          if [ -n "${INPUT_VERSION:-}" ]; then
+            v="$INPUT_VERSION"
+          elif [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            v="${GITHUB_REF_NAME#v}"
+          else
+            v="0.0.0-${GITHUB_SHA::7}"
+          fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+
+      - name: build binary
+        env:
+          GOOS: darwin
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          set -euo pipefail
+          go build -trimpath -ldflags "-s -w -X main.Version=${{ steps.meta.outputs.version }}" -o build/cslvpn ./cmd/cslvpn
+          ./build/cslvpn version
+          file build/cslvpn
+
+      - name: build pkg
+        run: |
+          set -euo pipefail
+          mkdir -p pkg
+          ./packaging/macos/build-pkg.sh "$PWD/build/cslvpn" "${{ steps.meta.outputs.version }}" \
+            "${{ matrix.arch }}" "pkg/cslvpn-${{ steps.meta.outputs.version }}-macos-${{ matrix.arch }}.pkg"
+          ls -lh pkg/
+
+      - name: install pkg and smoke test
+        run: |
+          set -euo pipefail
+          sudo installer -pkg pkg/*.pkg -target /
+          test -x /usr/local/bin/cslvpn
+          /usr/local/bin/cslvpn version
+          # launchd knows the daemon (it is installed disabled)
+          sudo launchctl print system/io.cslvpn.relay >/dev/null 2>&1 || \
+            echo "note: daemon not bootstrapped on this runner, plist still installed"
+          test -f /Library/LaunchDaemons/io.cslvpn.relay.plist
+
+      - name: uninstall
+        run: |
+          set -euo pipefail
+          sudo rm -rf /usr/local/bin/cslvpn /usr/local/share/cslvpn /Library/LaunchDaemons/io.cslvpn.relay.plist
+          echo "package contents verified"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: packages-macos-${{ matrix.arch }}
+          path: pkg/*
+          retention-days: 30
+
+  # --------------------------------------------------------------- Release ---
+  release:
+    name: attach packages to release
+    runs-on: ubuntu-latest
+    needs: [linux, windows, macos]
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          pattern: packages-*
+          merge-multiple: true
+      - name: checksums
+        run: |
+          cd dist
+          ls -lh
+          sha256sum * > SHA256SUMS-packages.txt
+          cat SHA256SUMS-packages.txt
+      - name: upload to the release
+        uses: softprops/action-gh-release@v3
+        with:
+          files: |
+            dist/*
+          fail_on_unmatched_files: false

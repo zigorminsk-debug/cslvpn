@@ -1,0 +1,36 @@
+[Unit]
+Description=CSLVPN relay server
+Documentation=https://github.com/zigorminsk-debug/cslvpn/blob/main/docs/SERVER.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Defaults are overridden by /etc/cslvpn/server.env (see server.env.example).
+Environment=CSLVPN_LISTEN=:7777
+Environment=CSLVPN_ADMIN=127.0.0.1:7778
+EnvironmentFile=-/etc/cslvpn/server.env
+ExecStart=/usr/bin/cslvpn server -listen ${CSLVPN_LISTEN} -admin ${CSLVPN_ADMIN}
+Restart=always
+RestartSec=2
+
+# The relay itself needs no privileges: it only opens UDP/TCP sockets on an
+# unprivileged port. Internet gateway mode (TUN + iptables) does need root -
+# run it from a drop-in with `User=root` and the extra capabilities, see
+# docs/SERVER.md section 5.
+DynamicUser=yes
+StateDirectory=cslvpn
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+RestrictAddressFamilies=AF_INET AF_INET6
+RestrictNamespaces=yes
+LockPersonality=yes
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+
+[Install]
+WantedBy=multi-user.target
