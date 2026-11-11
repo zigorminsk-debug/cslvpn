@@ -95,10 +95,24 @@ A_IP=$(grep -o 'is 26\.[0-9.]*' "$WORK/client-alice.log" | awk '{print $2}' | he
 B_IP=$(grep -o 'is 26\.[0-9.]*' "$WORK/client-bob.log"   | awk '{print $2}' | head -1)
 ok "alice=$A_IP (udp), bob=$B_IP (tcp)"
 
+# Wait until the peers can actually reach each other: the handshake finishing
+# does not guarantee that the first ICMP packet already found both endpoints.
+wait_ping() { # ns ip log attempts
+  local ns=$1 ip=$2 log=$3 n=${4:-15}
+  for i in $(seq 1 "$n"); do
+    if $SUDO ip netns exec "$ns" ping -c 2 -W 1 -q "$ip" >"$log" 2>&1 &&
+       grep -q " 0% packet loss" "$log"; then
+      return 0
+    fi
+    sleep 1
+  done
+  return 1
+}
+
 say "ping across the virtual LAN (UDP client -> TCP client)"
-$SUDO ip netns exec a ping -c 3 -W 2 "$B_IP" >"$WORK/ping-a-b.log" 2>&1 || die "ping a->b failed: $(cat "$WORK/ping-a-b.log")"
-grep -q " 0% packet loss" "$WORK/ping-a-b.log" && ok "a -> b reachable ($(grep -o 'time=[0-9.]*' "$WORK/ping-a-b.log" | head -1))"
-$SUDO ip netns exec b ping -c 3 -W 2 "$A_IP" >"$WORK/ping-b-a.log" 2>&1 || die "ping b->a failed"
+wait_ping a "$B_IP" "$WORK/ping-a-b.log" || die "ping a->b failed: $(cat "$WORK/ping-a-b.log")"
+ok "a -> b reachable ($(grep -oE 'min/avg/max[^ ]* = [0-9.]+/[0-9.]+' "$WORK/ping-a-b.log" | head -1))"
+wait_ping b "$A_IP" "$WORK/ping-b-a.log" || die "ping b->a failed: $(cat "$WORK/ping-b-a.log")"
 ok "b -> a reachable (bidirectional)"
 
 say "TCP through the tunnel (HTTP server on bob, curl from alice)"
@@ -120,7 +134,7 @@ for i in $(seq 1 20); do grep -q READY "$WORK/client-carol.log" 2>/dev/null && b
 grep -q "READY" "$WORK/client-carol.log" || die "carol did not connect"
 C_IP=$(grep -o 'is 26\.[0-9.]*' "$WORK/client-carol.log" | awk '{print $2}' | head -1)
 ok "carol=$C_IP in network $NET_B"
-if $SUDO ip netns exec a ping -c 1 -W 2 "$C_IP" >/dev/null 2>&1; then
+if $SUDO ip netns exec a ping -c 2 -W 2 "$C_IP" >/dev/null 2>&1; then
   die "isolation broken: alice reached carol from another network"
 fi
 ok "alice cannot reach carol (different networks are isolated)"
