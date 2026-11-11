@@ -27,7 +27,11 @@ sudo cslvpn client -server 203.0.113.10:7777 -network office -password s3cret -t
 суммами: [Releases](https://github.com/zigorminsk-debug/cslvpn/releases).
 
 ```bash
-# Linux x86_64
+# Linux x86_64 — пакет
+curl -LO https://github.com/zigorminsk-debug/cslvpn/releases/latest/download/cslvpn_0.2.0_amd64.deb
+sudo dpkg -i cslvpn_0.2.0_amd64.deb
+
+# или один бинарник
 curl -LO https://github.com/zigorminsk-debug/cslvpn/releases/latest/download/cslvpn-linux-amd64
 curl -LO https://github.com/zigorminsk-debug/cslvpn/releases/latest/download/SHA256SUMS-linux-amd64.txt
 sha256sum -c SHA256SUMS-linux-amd64.txt

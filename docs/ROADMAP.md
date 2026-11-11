@@ -15,10 +15,14 @@
 * ✅ Режим интернет-шлюза (`-internet` + `-gateway`, NAT)
 * ✅ Юнит- и интеграционные тесты, e2e на network namespaces (UDP+TCP+изоляция+NAT)
 * ✅ Сборка под Windows/Linux/macOS x64/arm64/armv7 в GitHub Actions
+* ✅ Установочные пакеты для всех трёх ОС, проверяемые установкой в CI
 
 ## v1.1 — эксплуатация
 
-* ⏳ Пакеты: `.deb`, `.rpm`, MSI, домашний репозиторий
+* ✅ Пакеты: `.deb`, `.rpm`, `.apk`, portable `.tar.gz`, MSI, `setup.exe`,
+  macOS `.pkg` — собираются и проверяются установкой в CI (workflow
+  `packages`), прикладываются к релизам по тегу (`packaging/README.md`)
+* ⏳ Домашний APT/YUM-репозиторий и подпись пакетов (GPG), нотаризация macOS
 * ⏳ `cslvpn client -config /etc/cslvpn.yaml` — конфиг-файл вместо флагов
 * ⏳ Метрики Prometheus (`/metrics`) + healthcheck для systemd/Docker
 * ⏳ Rate limiting рукопожатий и защита от перебора паролей (сейчас PBKDF2

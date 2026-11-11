@@ -3,11 +3,35 @@
 Один бинарник `cslvpn` содержит и сервер, и клиент. Клиенту нужны права на
 создание TUN-интерфейса (root/администратор или `CAP_NET_ADMIN`).
 
-## 1. Скачивание
+## 1. Установка
 
-* Linux/macOS/Windows x64, arm64, armv7 — артефакты сборки (вкладка **Actions**)
-  и релизы `nightly-*` / `v*`;
-* либо собрать самому: `go build -o cslvpn ./cmd/cslvpn` (Go 1.24+).
+Проще всего — штатным пакетом из релиза (workflow `packages` собирает их на
+каждый push):
+
+| Платформа | Файл | Команда |
+|---|---|---|
+| Debian/Ubuntu | `cslvpn_<ver>_{amd64,arm64}.deb` | `sudo dpkg -i cslvpn_*.deb` |
+| RHEL/Fedora | `cslvpn-<ver>-1.*.rpm` | `sudo rpm -Uvh cslvpn-*.rpm` |
+| Alpine | `cslvpn_<ver>_*.apk` | `sudo apk add --allow-untrusted cslvpn_*.apk` |
+| Windows | `cslvpn-<ver>-windows-amd64.msi` | `msiexec /i cslvpn-*.msi` |
+| Windows (exe) | `cslvpn-<ver>-windows-amd64-setup.exe` | двойной клик |
+| macOS | `cslvpn-<ver>-macos-<arch>.pkg` | `sudo installer -pkg cslvpn-*.pkg -target /` |
+| Любая Linux | `cslvpn-<ver>-linux-<arch>.tar.gz` | `tar -xzf …` |
+
+Пакет даёт `/usr/bin/cslvpn` (Windows: `C:\Program Files\CSLVPN\cslvpn.exe`,
+macOS: `/usr/local/bin/cslvpn`), юнит `cslvpn-client.service` и образец
+конфига `client.env`. Клиент по-прежнему нужно запускать с правами на TUN:
+юнит делает это через `User=root` + `CapabilityBoundingSet=CAP_NET_ADMIN
+CAP_NET_RAW`.
+
+```bash
+sudo cp /etc/cslvpn/client.env.example /etc/cslvpn/client.env  # сервер, сеть, пароль, транспорт
+sudo systemctl enable --now cslvpn-client.service
+journalctl -u cslvpn-client -f
+```
+
+Без пакетного менеджера: бинарники лежат в релизах и в артефактах сборки
+(вкладка **Actions**), либо `go build -o cslvpn ./cmd/cslvpn` (Go 1.24+).
 
 ## 2. Быстрый старт: сеть из трёх машин
 

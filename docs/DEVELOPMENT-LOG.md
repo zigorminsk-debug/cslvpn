@@ -218,7 +218,23 @@ L2/широковещание для игр, Windows-адаптер из кор�
    (`configuration 'macos-14-arm64-us-default' is not supported`) →
    `macos-latest`.
 
-Итог: прогон `42968650209` — зелёный, 6 артефактов
-(`packages-linux-{amd64,arm64,arm7}`, `packages-windows-amd64`,
+6. Релизная часть: job `release` падал на `sha256sum` (в `dist` попадал
+   0-байтный `sum.err` из stderr самой команды — GitHub отклоняет пустые
+   ассеты), затем на `ReleaseAsset size must be >= 1`. Теперь stderr идёт в
+   `$RUNNER_TEMP`, пустые файлы проверяются отдельно.
+7. `upload-artifact` сохраняет общий родительский каталог, поэтому у
+   windows-job получалось `dist/pkg/*.msi` и `dist/msi-install.log`, а шаг
+   загрузки брал только `dist/*` — MSI и setup.exe не попадали в релиз.
+   Добавлен шаг `flatten artifacts` (переносит всё на один уровень и
+   выбрасывает `*.log`); логи установщика остаются в артефактах прогона.
+
+Итог: прогоны `43052020005` (push) и `43052672951` (тег `v0.2.0`) — зелёные,
+6 артефактов (`packages-linux-{amd64,arm64,arm7}`, `packages-windows-amd64`,
 `packages-macos-{arm64,amd64}`); установка/удаление проверены на всех трёх
-семействах ОС.
+семействах ОС. В релизе
+[v0.2.0](https://github.com/zigorminsk-debug/cslvpn/releases/tag/v0.2.0)
+лежат 7 deb/apk, 3 rpm, 3 tar.gz, MSI, setup.exe, 2 pkg и
+`SHA256SUMS-packages.txt` — рядом с уже существовавшими бинарниками.
+
+Ручных действий для выпуска нет: push → сборка пакетов и проверка установкой;
+тег `v*` → те же пакеты прикрепляются к релизу.

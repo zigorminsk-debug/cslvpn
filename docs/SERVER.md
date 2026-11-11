@@ -143,9 +143,43 @@ sudo cslvpn client -server <IP>:7777 -network office -password s3cret -internet
 > другу — уменьшите `-nat-cidr` и не используйте `-internet` совместно с
 > общими сетями.
 
-## 6. systemd
+## 6. Установка пакетом
 
-`/etc/systemd/system/cslvpn.service`:
+Быстрее всего поставить ретранслятор штатным пакетом — Workflow `packages`
+собирает их на каждый push, а к тегам `v*` они прикладываются к релизу:
+
+```bash
+# Debian/Ubuntu (amd64, arm64, armv7)
+sudo dpkg -i cslvpn_<ver>_amd64.deb
+# RHEL/Fedora (x86_64, aarch64, armv7hl)
+sudo rpm -Uvh cslvpn-<ver>-1.x86_64.rpm
+# Alpine
+sudo apk add --allow-untrusted cslvpn_<ver>_x86_64.apk
+```
+
+Пакет кладёт бинарник в `/usr/bin/cslvpn`, юниты — в
+`/usr/lib/systemd/system/`, образцы конфигов — в `/etc/cslvpn/*.example`
+(0640), документацию — в `/usr/share/doc/cslvpn/`. Сервисы намеренно **не
+включаются** автоматически: сначала правьте конфиг.
+
+```bash
+sudo cp /etc/cslvpn/server.env.example /etc/cslvpn/server.env
+sudo systemctl enable --now cslvpn.service      # ретранслятор
+sudo systemctl enable --now cslvpn-client.service  # только если это клиент
+curl -s http://127.0.0.1:7778/api/v1/health     # {"status": "ok"}
+```
+
+Юнит `cslvpn.service` работает под `DynamicUser=yes` со строгим hardening
+(`ProtectSystem=strict`, `PrivateTmp`, `NoNewPrivileges`, только
+`CAP_NET_BIND_SERVICE`/`CAP_NET_ADMIN` при `-gateway`), `StateDirectory=cslvpn`,
+`EnvironmentFile=-/etc/cslvpn/server.env`. Удаление пакета останавливает и
+отключает сервисы, но `/etc/cslvpn` сохраняет — конфигурация не теряется.
+
+Полный список того, что ставится, и грабли сборки — `packaging/README.md`.
+
+## 7. systemd вручную
+
+Если ставите бинарник без пакета — `/etc/systemd/system/cslvpn.service`:
 
 ```ini
 [Unit]
@@ -174,7 +208,7 @@ sudo systemctl enable --now cslvpn
 journalctl -u cslvpn -f
 ```
 
-## 7. Docker
+## 8. Docker
 
 `Dockerfile` в корне репозитория собирает статический бинарник. Режим
 ретранслятора требует-NAT только для `-gateway`:
@@ -188,7 +222,7 @@ docker run -d --name cslvpn --network host cslvpn \
 `--network host` нужен, чтобы UDP и TCP были видны снаружи и чтобы работал
 режим шлюза (TUN + iptables на хосте).
 
-## 8. Мониторинг и эксплуатация
+## 9. Мониторинг и эксплуатация
 
 * `GET /api/v1/stats` → `counters.sessions`, `rx_frames`, `tx_frames`,
   `rx_bytes`, `tx_bytes`, `dropped`, `handshakes`;
@@ -199,7 +233,7 @@ docker run -d --name cslvpn --network host cslvpn \
 * логи содержат только метаданные (кто, когда, откуда, сколько), содержимое
   туннеля не пишется никогда.
 
-## 9. Производительность
+## 10. Производительность
 
 * один vCPU тянет несколько сотен Мбит/с ретрансляции (AES-NI);
 * UDP-сокет использует буферы 4 МБ; при большом числе участников поднимите
