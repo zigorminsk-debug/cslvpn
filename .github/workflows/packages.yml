@@ -150,8 +150,15 @@ jobs:
       - name: remove the package again
         if: matrix.arch == 'amd64'
         run: |
-          dpkg -r cslvpn 2>&1 | tail -3 || true
-          dpkg -l cslvpn 2>/dev/null | grep -q '^ii' && { echo "still installed"; exit 1; } || true
+          set +e
+          out=$(sudo dpkg -r cslvpn 2>&1); rc=$?
+          echo "$out"
+          if [ $rc -ne 0 ]; then echo "::error::dpkg -r failed ($rc): $(echo "$out" | tr '\n' ' ')"; exit 1; fi
+          if dpkg -s cslvpn >/dev/null 2>&1; then echo "::error::package is still installed"; exit 1; fi
+          if [ -e /usr/bin/cslvpn ]; then echo "::error::/usr/bin/cslvpn survived the removal"; exit 1; fi
+          # user configuration must survive a package removal
+          sudo mkdir -p /etc/cslvpn && sudo touch /etc/cslvpn/client.env
+          echo "removal OK, /etc/cslvpn kept"
 
       - uses: actions/upload-artifact@v7
         with:
@@ -205,7 +212,12 @@ jobs:
             -d Src=build\cslvpn.exe `
             -d License=LICENSE `
             -d Readme=docs\SERVER.md `
-            -o "pkg/cslvpn-${{ steps.meta.outputs.version }}-windows-amd64.msi" packaging\wix\cslvpn.wxs
+            -o "pkg/cslvpn-${{ steps.meta.outputs.version }}-windows-amd64.msi" packaging\wix\cslvpn.wxs *>&1 |
+            Tee-Object wix.log
+          if ($LASTEXITCODE -ne 0) {
+            Get-Content wix.log -Tail 30 | ForEach-Object { Write-Host "::error::wix: $_" }
+            throw "wix build failed: $LASTEXITCODE"
+          }
           Get-ChildItem pkg
 
       - name: build NSIS installer

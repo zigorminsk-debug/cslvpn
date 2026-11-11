@@ -28,7 +28,7 @@
       <ComponentGroupRef Id="Binaries" />
       <ComponentRef Id="PathEnvironment" />
       <ComponentRef Id="StartMenuShortcut" />
-      <ComponentRef Id="Docs" />
+      <ComponentRef Id="DocsComponent" />
     </Feature>
 
     <StandardDirectory Id="ProgramFiles64Folder">
@@ -84,11 +84,5 @@
       </Component>
     </ComponentGroup>
 
-    <ComponentGroup Id="FirewallRules" Directory="INSTALLFOLDER">
-      <!-- Firewall rules are added by the installer as custom actions:
-           netsh advfirewall firewall add rule name="CSLVPN relay UDP" ...
-           Kept out of the WiX fragments on purpose: Windows Firewall rules are
-           machine state, not files, and we do not want to version them twice. -->
-    </ComponentGroup>
   </Package>
 </Wix>
