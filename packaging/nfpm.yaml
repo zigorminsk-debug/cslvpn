@@ -14,7 +14,9 @@ name: cslvpn
 arch: ${ARCH}          # amd64 / arm64 / armv7 -> mapped by the workflow
 platform: linux
 version: ${VERSION}
-version_schema: semver
+# deb/rpm/apk all accept plain x.y.z, which is what the workflow produces.
+version_schema: none
+# Versions come from git tags (1.2.3) or from CI as 0.0.<run number>.
 section: net
 priority: optional
 maintainer: CSLVPN contributors <cslvpn@users.noreply.github.com>

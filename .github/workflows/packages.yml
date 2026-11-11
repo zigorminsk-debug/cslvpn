@@ -67,7 +67,9 @@ jobs:
           elif [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             v="${GITHUB_REF_NAME#v}"
           else
-            v="0.0.0-${GITHUB_SHA::7}"
+            # Universal scheme: valid for semver, deb, rpm, apk and MSI (which
+            # wants exactly three numeric parts below 65536).
+            v="0.0.${GITHUB_RUN_NUMBER}"
           fi
           echo "version=$v" >> "$GITHUB_OUTPUT"
           echo "packaging $v for ${{ matrix.arch }}"
@@ -106,6 +108,19 @@ jobs:
             nfpm package -f packaging/nfpm.yaml -p "$format" -t "pkg/"
           done
           ls -lh pkg/
+
+      - name: diagnose packaging
+        if: failure()
+        run: |
+          set +e
+          esc() { tr '\n' ' ' | tail -c 1500; }
+          echo "::error::version file: $(cat VERSION 2>/dev/null | esc)"
+          for format in deb rpm apk; do
+            out=$(nfpm package -f packaging/nfpm.yaml -p "$format" -t /tmp/diag/ 2>&1)
+            echo "::error::nfpm $format (exit $?): $(echo "$out" | esc)"
+          done
+          echo "::error::binary: $(file cslvpn 2>&1 | esc)"
+          echo "::error::nfpm version: $(nfpm --version 2>&1 | esc)"
 
       - name: build portable tarball
         env:
@@ -253,6 +268,15 @@ jobs:
           if (Test-Path $exe) { throw "NSIS: uninstall left files behind" }
           Write-Host "NSIS install/uninstall OK"
 
+      - name: diagnose windows packaging
+        if: failure()
+        shell: pwsh
+        run: |
+          Write-Host "::error::wix version: $(wix --version 2>&1)"
+          Write-Host "::error::nsis: $(Test-Path 'C:\Program Files (x86)\NSIS\makensis.exe')"
+          Get-ChildItem pkg -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_.Name }
+          if (Test-Path msi-install.log) { Get-Content msi-install.log -Tail 40 | ForEach-Object { Write-Host "::error::$_" } }
+
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -292,7 +316,7 @@ jobs:
           elif [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             v="${GITHUB_REF_NAME#v}"
           else
-            v="0.0.0-${GITHUB_SHA::7}"
+            v="0.0.${GITHUB_RUN_NUMBER}"
           fi
           echo "version=$v" >> "$GITHUB_OUTPUT"
 
@@ -330,6 +354,13 @@ jobs:
           set -euo pipefail
           sudo rm -rf /usr/local/bin/cslvpn /usr/local/share/cslvpn /Library/LaunchDaemons/io.cslvpn.relay.plist
           echo "package contents verified"
+
+      - name: diagnose macos packaging
+        if: failure()
+        run: |
+          set +e
+          ls -l pkg build 2>&1 | head -20
+          echo "::error::binaries: $(file build/cslvpn 2>&1)"
 
       - uses: actions/upload-artifact@v7
         with:
