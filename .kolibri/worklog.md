@@ -15,3 +15,4 @@
 - **Модель:** qwen3.6-colibri
 - **Сделано:** Fix PE header generation to produce a valid executable
 - **Файлы:** `~ main.go`
+- **Итог:** сборка прошла — https://github.com/zigorminsk-debug/cslvpn/actions/runs/43737172408; релиз https://github.com/zigorminsk-debug/cslvpn/releases/tag/build-6
