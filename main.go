@@ -7,16 +7,15 @@ import (
 )
 
 func main() {
-	// Determine the directory where the executable resides
-	execPath, err := os.Executable()
+	// Determine the current working directory
+	cwd, err := os.Getwd()
 	if err != nil {
-		fmt.Println("Error getting executable path:", err)
+		fmt.Println("Error getting current directory:", err)
 		os.Exit(1)
 	}
-	execDir := filepath.Dir(execPath)
 
-	// Create the artifacts directory relative to the executable
-	artifactsDir := filepath.Join(execDir, "artifacts")
+	// Create the artifacts directory relative to the current working directory
+	artifactsDir := filepath.Join(cwd, "artifacts")
 	err = os.MkdirAll(artifactsDir, 0755)
 	if err != nil {
 		fmt.Println("Error creating artifacts directory:", err)
