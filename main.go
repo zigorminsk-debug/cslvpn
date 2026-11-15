@@ -3,18 +3,28 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 )
 
 func main() {
-	// Create the artifacts directory if it doesn't exist
-	err := os.MkdirAll("artifacts", 0755)
+	// Determine the directory where the executable resides
+	execPath, err := os.Executable()
+	if err != nil {
+		fmt.Println("Error getting executable path:", err)
+		os.Exit(1)
+	}
+	execDir := filepath.Dir(execPath)
+
+	// Create the artifacts directory relative to the executable
+	artifactsDir := filepath.Join(execDir, "artifacts")
+	err = os.MkdirAll(artifactsDir, 0755)
 	if err != nil {
 		fmt.Println("Error creating artifacts directory:", err)
 		os.Exit(1)
 	}
 
 	// Create a dummy file in the artifacts directory to simulate a build artifact
-	filePath := "artifacts/cslvpn.exe"
+	filePath := filepath.Join(artifactsDir, "cslvpn.exe")
 	f, err := os.Create(filePath)
 	if err != nil {
 		fmt.Println("Error creating artifact file:", err)
