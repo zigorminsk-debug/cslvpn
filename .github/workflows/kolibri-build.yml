@@ -12,7 +12,6 @@ permissions:
 concurrency:
   group: kolibri-build-${{ github.ref }}
   cancel-in-progress: true
-
 
 jobs:
   build:
@@ -22,7 +21,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { target: windows, os: windows-latest }
+          - { target: windows, os: windows-latest }
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
@@ -43,17 +42,20 @@ jobs:
         with:
           name: cslvpn-${{ matrix.target }}
           path: dist/
-          if-no-files-found: error
+          if-no-files-found: error
 
   release:
     name: Release
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Download builds
+      # Each artifact is fetched by name into a folder of its own: without a
+      # name the layout depends on how many artifacts the run has.
+      - name: Download cslvpn-windows
         uses: actions/download-artifact@v8
         with:
-          path: artifacts
+          name: cslvpn-windows
+          path: artifacts/cslvpn-windows
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -62,7 +64,14 @@ jobs:
           TITLE: "Сборка №${{ github.run_number }}"
           NOTES: ${{ github.event.head_commit.message }}
         run: |
-          cd artifacts
+          # A failure here is reported as an annotation, which Kolibri Forge
+          # shows to the user: the build itself is good at this point.
+          fail() {
+            echo "::error title=Release::$(printf '%s' "$1" | tr '\r\n' '  ' | cut -c1-600 | sed 's/%/%25/g')"
+            exit 1
+          }
+          cd artifacts || fail "The build left no files to publish."
+          shopt -s nullglob
           # Artifacts lose the executable bit; restore it for binaries and scripts.
           find . -type f | while IFS= read -r f; do
             case "$(head -c 4 "$f" | od -An -tx1 | tr -d ' \n')" in
@@ -71,6 +80,18 @@ jobs:
           done
           for d in */; do
             d="${d%/}"
-            (cd "$d" && zip -qr "../$d.zip" .)
+            apks=("$d"/*.apk)
+            if [ "${#apks[@]}" -gt 0 ]; then
+              # An APK is published as it is: a phone installs it directly.
+              cp "${apks[@]}" . || fail "Could not copy the APK from $d."
+              continue
+            fi
+            (cd "$d" && zip -qr "../$d.zip" .) || fail "Could not pack $d."
           done
-          gh release create "$TAG" ./*.zip --target "$GITHUB_SHA" --title "$TITLE" --notes "${NOTES:-Автоматическая сборка}"
+          archives=(./*.zip ./*.apk)
+          [ "${#archives[@]}" -gt 0 ] || fail "The build left no files to publish."
+          if ! out="$(gh release create "$TAG" "${archives[@]}" --target "$GITHUB_SHA" --title "$TITLE" --notes "${NOTES:-Автоматическая сборка}" 2>&1)"; then
+            echo "$out"
+            fail "$out"
+          fi
+          echo "$out"
